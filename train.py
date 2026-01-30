@@ -62,6 +62,7 @@ def train(hyp, opt, device, tb_writer=None):
     init_seeds(2 + rank)
     with open(opt.data) as f:
         data_dict = yaml.safe_load(f)  # data dict
+    print("data_dict", data_dict)
     is_coco = opt.data.endswith('coco.yaml')
 
     # Logging- Doing this before checking the dataset. Might update data_dict
@@ -184,6 +185,14 @@ def train(hyp, opt, device, tb_writer=None):
     if opt.sync_bn and cuda and rank != -1:
         model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model).to(device)
         logger.info('Using SyncBatchNorm()')
+
+
+    ckpt = {
+            'model': deepcopy(model.module if is_parallel(model) else model).half(),
+            }
+
+    # Save last, best and delete
+    torch.save(ckpt, last)
 
     # Trainloader
     dataloader, dataset = create_dataloader(train_path, imgsz, batch_size, gs, opt,
@@ -330,8 +339,11 @@ def train(hyp, opt, device, tb_writer=None):
 
                 # Plot
                 if plots and ni < 33:
-                    f = save_dir / f'train_batch{ni}.jpg'  # filename
-                    plot_images(imgs, targets, paths, f, kpt_label=kpt_label)
+                    try:
+                        f = save_dir / f'train_batch{ni}.jpg'  # filename
+                        plot_images(imgs, targets, paths, f, kpt_label=kpt_label)
+                    except Exception as e:
+                        pass
                     #Thread(target=plot_images, args=(imgs, targets, paths, f), daemon=True).start()
                     # if tb_writer:
                     #     tb_writer.add_image(f, result, dataformats='HWC', global_step=epoch)
@@ -460,12 +472,16 @@ def train(hyp, opt, device, tb_writer=None):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--weights', type=str, default='yolov5s.pt', help='initial weights path')
-    parser.add_argument('--cfg', type=str, default='', help='model.yaml path')
-    parser.add_argument('--data', type=str, default='data/coco128.yaml', help='data.yaml path')
-    parser.add_argument('--hyp', type=str, default='data/hyp.scratch.yaml', help='hyperparameters path')
+    parser.add_argument('--weights', type=str, default='', help='initial weights path')
+
+    # parser.add_argument('--cfg', type=str, default='/home/faith/yolov5-pose-onnx/models/hub/yolov5s6_kpts.yaml', help='model.yaml path')
+    parser.add_argument('--cfg', type=str, default='/home/faith/yolov5-pose-onnx/models/hub/yolov5n-ghost-v3.yaml', help='model.yaml path')
+    parser.add_argument('--batch-size', type=int, default=256, help='total batch size for all GPUs')
+    # parser.add_argument('--batch-size', type=int, default=128, help='total batch size for all GPUs')
+    
+    parser.add_argument('--data', type=str, default='data/coco_kpts.yaml', help='data.yaml path')
+    parser.add_argument('--hyp', type=str, default='config/Yolov5s6_person_640_hyp.yaml', help='hyperparameters path')
     parser.add_argument('--epochs', type=int, default=300)
-    parser.add_argument('--batch-size', type=int, default=16, help='total batch size for all GPUs')
     parser.add_argument('--img-size', nargs='+', type=int, default=[640, 640], help='[train, test] image sizes')
     parser.add_argument('--rect', action='store_true', help='rectangular training')
     parser.add_argument('--resume', nargs='?', const=True, default=False, help='resume most recent training')
@@ -496,6 +512,9 @@ if __name__ == '__main__':
     parser.add_argument('--artifact_alias', type=str, default="latest", help='version of dataset artifact to be used')
     parser.add_argument('--kpt-label', action='store_true', help='use keypoint labels for training')
     opt = parser.parse_args()
+    
+    opt.kpt_label = True
+
 
     # Set DDP variables
     opt.world_size = int(os.environ['WORLD_SIZE']) if 'WORLD_SIZE' in os.environ else 1

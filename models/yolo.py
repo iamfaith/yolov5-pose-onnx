@@ -10,7 +10,8 @@ sys.path.append(Path(__file__).parent.parent.absolute().__str__())  # to run '$ 
 logger = logging.getLogger(__name__)
 
 from models.common import *
-from models.experimental import *
+# from models.experimental import *
+from models.experimental import MixConv2d, CrossConv
 from utils.autoanchor import check_anchor_order
 from utils.general import make_divisible, check_file, set_logging
 from utils.torch_utils import time_synchronized, fuse_conv_and_bn, model_info, scale_img, initialize_weights, \
@@ -171,7 +172,7 @@ class Model(nn.Module):
 
     def forward_once(self, x, profile=False):
         y, dt = [], []  # outputs
-        for m in self.model:
+        for i, m in enumerate(self.model):
             if m.f != -1:  # if not from previous layer
                 x = y[m.f] if isinstance(m.f, int) else [x if j == -1 else y[j] for j in m.f]  # from earlier layers
 
@@ -282,7 +283,7 @@ def parse_model(d, ch):  # model_dict, input_channels(3)
                 pass
 
         n = max(round(n * gd), 1) if n > 1 else n  # depth gain
-        if m in [Conv, GhostConv, Bottleneck, GhostBottleneck, SPP, DWConv, MixConv2d, Focus, ConvFocus, CrossConv, BottleneckCSP,
+        if m in [Conv, GhostConv, Bottleneck, GhostBottleneck, SPP, DWConv, MixConv2d, Focus, ConvFocus, CrossConv, BottleneckCSP, C3Ghost,
                  C3, C3TR]:
             c1, c2 = ch[f], args[0]
             if c2 != no:  # if not output
@@ -292,7 +293,7 @@ def parse_model(d, ch):  # model_dict, input_channels(3)
             if m in [BottleneckCSP, C3, C3TR]:
                 args.insert(2, n)  # number of repeats
                 n = 1
-            if m in [Conv, GhostConv, Bottleneck, GhostBottleneck, DWConv, MixConv2d, Focus, ConvFocus, CrossConv, BottleneckCSP, C3, C3TR]:
+            if m in [Conv, GhostConv, Bottleneck, GhostBottleneck, DWConv, MixConv2d, Focus, ConvFocus, CrossConv, BottleneckCSP, C3Ghost, C3, C3TR]:
                 if 'act' in d.keys():
                     args_dict = {"act" : d['act']}
         elif m is nn.BatchNorm2d:

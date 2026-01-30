@@ -1,0 +1,81 @@
+# YOLOv5 🚀 by Ultralytics, GPL-3.0 license
+
+# Parameters
+nc: 1  # number of classes
+nkpt: 17 # number of keypoints
+depth_multiple: 0.33  # model depth multiple
+width_multiple: 0.25  # layer channel multiple
+act: "ReLU"    #All activation must be taken from here
+dw_conv_kpt: True
+
+anchors:
+  - [10,13, 16,30, 33,23]  # P3/8
+  - [30,61, 62,45, 59,119]  # P4/16
+  - [116,90, 156,198, 373,326]  # P5/32
+
+
+
+  #                from  n    params  module                                  arguments                     
+  # 0                -1  1       232  models.common.Conv                      [3, 8, 3, 2]                  
+  # 1                -1  1       404  models.common.GhostConv                 [8, 8, 3, 2]                  
+  # 2                -1  1       255  models.common.C3Ghost                   [8, 8, 1]                     
+  # 3                -1  1       808  models.common.GhostConv                 [8, 16, 3, 2]                 
+  # 4                -1  1       782  models.common.C3Ghost                   [16, 16, 1]                   
+  # 5                -1  1      2768  models.common.GhostConv                 [16, 32, 3, 2]                
+  # 6                -1  1      2652  models.common.C3Ghost                   [32, 32, 1]                   
+  # 7                -1  1      7608  models.common.GhostConv                 [32, 48, 3, 2]                
+  # 8                -1  1      5610  models.common.C3Ghost                   [48, 48, 1]                   
+
+
+backbone:
+  [[-1, 1, Conv, [16, 3, 2]],       # 0-P1/2
+   [-1, 1, GhostConv, [32, 3, 2]],  # 1-P2/4
+   [-1, 2, C3Ghost, [32]],
+
+   [-1, 1, GhostConv, [64, 3, 2]],  # 3-P3/8
+   [-1, 3, C3Ghost, [64]],
+
+   [-1, 1, GhostConv, [128, 3, 2]], # 5-P4/16
+   [-1, 3, C3Ghost, [128]],
+
+   [-1, 1, GhostConv, [192, 3, 2]], # 7-P5/32
+   [-1, 2, C3Ghost, [192]],         # 更少层数
+  ]
+head:
+  [[-1, 1, GhostConv, [96, 1, 1]],
+   [-1, 1, nn.Upsample, [None, 2, 'nearest']],
+   [[-1, 6], 1, Concat, [1]],  
+   [-1, 2, C3Ghost, [96, False]],  # P4
+
+   [-1, 1, GhostConv, [48, 1, 1]],
+   [-1, 1, nn.Upsample, [None, 2, 'nearest']],
+   [[-1, 4], 1, Concat, [1]],  
+   [-1, 2, C3Ghost, [48, False]],  # P3 (small)
+
+   [-1, 1, GhostConv, [64, 3, 2]],
+   [[-1, 13], 1, Concat, [1]],  
+   [-1, 2, C3Ghost, [96, False]],  # P4 (medium)
+
+   [-1, 1, GhostConv, [128, 3, 2]],
+   [[-1, 8], 1, Concat, [1]],  
+   [-1, 2, C3Ghost, [192, False]], # P5 (large)
+
+   [[14, 17, 20], 1, Detect, [nc, anchors, nkpt]],  # Detect(P3, P4, P5)
+  ]
+
+#   9                -1  1       924  models.common.GhostConv                 [48, 24, 1, 1]                
+#  10                -1  1         0  torch.nn.modules.upsampling.Upsample    [None, 2, 'nearest']          
+#  11           [-1, 6]  1         0  models.common.Concat                    [1]                           
+#  12                -1  1      2349  models.common.C3Ghost                   [56, 24, 1, False]            
+#  13                -1  1       424  models.common.GhostConv                 [24, 16, 1, 1]                
+#  14                -1  1         0  torch.nn.modules.upsampling.Upsample    [None, 2, 'nearest']          
+#  15           [-1, 4]  1         0  models.common.Concat                    [1]                           
+#  16                -1  1      1038  models.common.C3Ghost                   [32, 16, 1, False]            
+#  17                -1  1      1384  models.common.GhostConv                 [16, 16, 3, 2]                
+#  18          [-1, 13]  1         0  models.common.Concat                    [1]                           
+#  19                -1  1      1773  models.common.C3Ghost                   [32, 24, 1, False]            
+#  20                -1  1      3920  models.common.GhostConv                 [24, 32, 3, 2]                
+#  21           [-1, 8]  1         0  models.common.Concat                    [1]                           
+#  22                -1  1      7146  models.common.C3Ghost                   [80, 48, 1, False]            
+#  23      [14, 17, 20]  1      1206  models.yolo.Detect                      [1, [[10, 13, 16, 30, 33, 23], [30, 61, 62, 45, 59, 119], [116, 90, 156, 198, 373, 326]], [16, 16, 32]]
+# YOLOv5n-ghost-v3 summary: 377 layers, 41283 parameters, 41283 gradients, 0.2 GFLOPs

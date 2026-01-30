@@ -25,7 +25,8 @@ from utils.torch_utils import select_device
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--weights', type=str, default='./yolov5s.pt', help='weights path')
+    # parser.add_argument('--weights', type=str, default='./yolo5s.pt', help='weights path')
+    parser.add_argument('--weights', type=str, default='runs/train/exp/weights/last.pt', help='weights path')
     parser.add_argument('--img-size', nargs='+', type=int, default=[640, 640], help='image size')  # height, width
     parser.add_argument('--batch-size', type=int, default=1, help='batch size')
     parser.add_argument('--grid', action='store_true', help='export Detect() layer grid')
@@ -35,6 +36,7 @@ if __name__ == '__main__':
     parser.add_argument('--export-nms', action='store_true',
                         help='export the nms part in ONNX model')  # ONNX-only, #opt.grid has to be set True for nms export to work
     opt = parser.parse_args()
+    opt.grid = True
     opt.img_size *= 2 if len(opt.img_size) == 1 else 1  # expand
     print(opt)
     set_logging()
