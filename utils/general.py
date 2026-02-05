@@ -82,7 +82,7 @@ def check_git_status():
     try:
         assert Path('.git').exists(), 'skipping check (not a git repository)'
         assert not isdocker(), 'skipping check (Docker image)'
-        assert check_online(), 'skipping check (offline)'
+        # assert check_online(), 'skipping check (offline)'
 
         cmd = 'git fetch && git config --get remote.origin.url'
         url = subprocess.check_output(cmd, shell=True).decode().strip().rstrip('.git')  # github repo url
@@ -253,7 +253,7 @@ def labels_to_class_weights(labels, nc=80):
         return torch.Tensor()
 
     labels = np.concatenate(labels, 0)  # labels.shape = (866643, 5) for COCO
-    classes = labels[:, 0].astype(np.int)  # labels = [class xywh]
+    classes = labels[:, 0].astype(np.int64)  # labels = [class xywh]
     weights = np.bincount(classes, minlength=nc)  # occurrences per class
 
     # Prepend gridpoint count (for uCE training)

@@ -367,9 +367,12 @@ class Albumentations:
                 A.ImageCompression(quality_lower=75, p=0.0)
             ]
 
+        
+        #   bbox_params=A.BboxParams(format="pascal_voc", label_fields=["class_labels"]))
             self.transform = A.Compose(
                 T,
-                bbox_params=A.BboxParams(format='yolo', label_fields=['class_labels']),
+                # bbox_params=A.BboxParams(format='yolo', label_fields=['class_labels']),
+                bbox_params=A.BboxParams(format='pascal_voc', label_fields=['class_labels']),
                 keypoint_params=A.KeypointParams(format='xy', remove_invisible=False)
             )
 
@@ -384,30 +387,35 @@ class Albumentations:
             # 拆分：class_id + bbox(4) + keypoints(51)
             class_ids = labels[:, 0]
             bboxes = labels[:, 1:5]
-            keypoints = labels[:, 5:].reshape(-1, 17, 3)  # 假设17个关键点，每个(x,y,v)
+            # keypoints = labels[:, 5:].reshape(-1, 17, 3)  # 假设17个关键点，每个(x,y,v)
+            keypoints = labels[:, 5:].reshape(-1,2)  # 假设17个关键点，每个(x,y,v)
 
             # 转换成 albumentations 接受的格式 (只支持 xy，v要自己保留)
-            keypoints_xy = [[(x, y) for (x, y, v) in kp] for kp in keypoints]
+            # keypoints_xy = [[(x, y) for (x, y, v) in kp] for kp in keypoints]
+            keypoints_xy = keypoints
 
             new = self.transform(
                 image=im,
                 bboxes=bboxes,
                 class_labels=class_ids,
-                keypoints=sum(keypoints_xy, [])  # flatten
+                keypoints=keypoints_xy
             )
+            
+    
 
             im = new['image']
             new_bboxes = new['bboxes']
-            new_classes = new['class_labels']
+            new_classes = np.array(new['class_labels'])
             new_keypoints = new['keypoints']
 
             # 还原成 (x,y,v)，这里 v 不会被 albumentations处理，需要你自己保留原始 v
-            new_keypoints = np.array(new_keypoints).reshape(-1, 17, 2)
-            v = keypoints[:, :, 2]  # 原始可见性
-            new_keypoints = np.concatenate([new_keypoints, v[..., None]], axis=-1)
+            # new_keypoints = np.array(new_keypoints).reshape(-1, 17, 2)
+            # v = keypoints[:, :, 2]  # 原始可见性
+            # new_keypoints = np.concatenate([new_keypoints, v[..., None]], axis=-1)
 
+            # 1 + 4 + 34 
             # 拼接回 YOLO pose 格式
-            labels = np.concatenate([new_classes[:, None], new_bboxes, new_keypoints.reshape(-1, 51)], axis=1)
+            labels = np.concatenate([new_classes[:, None], new_bboxes, new_keypoints.reshape(-1, 34)], axis=1)
 
         return im, labels
 
@@ -489,7 +497,7 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
                 x[:, 0] = 0
 
         n = len(shapes)  # number of images
-        bi = np.floor(np.arange(n) / batch_size).astype(np.int)  # batch index
+        bi = np.floor(np.arange(n) / batch_size).astype(np.int64)  # batch index
         nb = bi[-1] + 1  # number of batches
         self.batch = bi  # batch index of image
         self.n = n
