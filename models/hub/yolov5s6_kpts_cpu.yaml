@@ -3,6 +3,7 @@ nc: 1  # number of classes
 nkpt: 17 # number of keypoints
 depth_multiple: 0.33  # model depth multiple
 width_multiple: 0.50  # layer channel multiple
+act: "ReLU"  #All activation must be taken from here
 dw_conv_kpt: True
 
 # anchors
