@@ -346,6 +346,73 @@ def img2label_paths(img_paths):
     return ['txt'.join(x.replace(sa, sb, 1).rsplit(x.split('.')[-1], 1)) for x in img_paths]
 
 
+
+
+class Albumentations:
+    def __init__(self):
+        self.transform = None
+        # prefix = colorstr('albumentations: ')
+        prefix = 'albumentations: '
+        try:
+            import albumentations as A
+            # check_version(A.__version__, '1.0.3', hard=True)
+
+            T = [
+                A.Blur(p=0.01),
+                A.MedianBlur(p=0.01),
+                A.ToGray(p=0.01),
+                A.CLAHE(p=0.01),
+                A.RandomBrightnessContrast(p=0.0),
+                A.RandomGamma(p=0.0),
+                A.ImageCompression(quality_lower=75, p=0.0)
+            ]
+
+            self.transform = A.Compose(
+                T,
+                bbox_params=A.BboxParams(format='yolo', label_fields=['class_labels']),
+                keypoint_params=A.KeypointParams(format='xy', remove_invisible=False)
+            )
+
+            logging.info(prefix + ', '.join(f'{x}'.replace('always_apply=False, ', '') for x in T if x.p))
+        except ImportError:
+            pass
+        except Exception as e:
+            logging.info(f'{prefix}{e}')
+
+    def __call__(self, im, labels, p=1.0):
+        if self.transform and random.random() < p:
+            # 拆分：class_id + bbox(4) + keypoints(51)
+            class_ids = labels[:, 0]
+            bboxes = labels[:, 1:5]
+            keypoints = labels[:, 5:].reshape(-1, 17, 3)  # 假设17个关键点，每个(x,y,v)
+
+            # 转换成 albumentations 接受的格式 (只支持 xy，v要自己保留)
+            keypoints_xy = [[(x, y) for (x, y, v) in kp] for kp in keypoints]
+
+            new = self.transform(
+                image=im,
+                bboxes=bboxes,
+                class_labels=class_ids,
+                keypoints=sum(keypoints_xy, [])  # flatten
+            )
+
+            im = new['image']
+            new_bboxes = new['bboxes']
+            new_classes = new['class_labels']
+            new_keypoints = new['keypoints']
+
+            # 还原成 (x,y,v)，这里 v 不会被 albumentations处理，需要你自己保留原始 v
+            new_keypoints = np.array(new_keypoints).reshape(-1, 17, 2)
+            v = keypoints[:, :, 2]  # 原始可见性
+            new_keypoints = np.concatenate([new_keypoints, v[..., None]], axis=-1)
+
+            # 拼接回 YOLO pose 格式
+            labels = np.concatenate([new_classes[:, None], new_bboxes, new_keypoints.reshape(-1, 51)], axis=1)
+
+        return im, labels
+
+
+
 class LoadImagesAndLabels(Dataset):  # for training/testing
     def __init__(self, path, img_size=640, batch_size=16, augment=False, hyp=None, rect=False, image_weights=False,
                  cache_images=False, single_cls=False, stride=32, pad=0.0, prefix='',square=False, tidl_load=False, kpt_label=True):
@@ -362,6 +429,7 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
         self.path = path
         self.kpt_label = kpt_label
         self.flip_index = [0, 2, 1, 4, 3, 6, 5, 8, 7, 10, 9, 12, 11, 14, 13, 16, 15]
+        self.albumentations = Albumentations() if augment else None
 
         try:
             f = []  # image files
@@ -591,6 +659,10 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
                                                  perspective=hyp['perspective'],
                                                  kpt_label=self.kpt_label)
 
+            img, labels = self.albumentations(img, labels)
+            nL = len(labels)  # update after albumentations
+            
+
             # Augment colorspace
             augment_hsv(img, hgain=hyp['hsv_h'], sgain=hyp['hsv_s'], vgain=hyp['hsv_v'])
 
@@ -674,6 +746,7 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
             l[:, 0] = i  # add target image index for build_targets()
 
         return torch.stack(img4, 0), torch.cat(label4, 0), path4, shapes4
+
 
 
 # Ancillary functions --------------------------------------------------------------------------------------------------
