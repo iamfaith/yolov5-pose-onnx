@@ -472,11 +472,11 @@ def train(hyp, opt, device, tb_writer=None):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--weights', type=str, default='', help='initial weights path')
+    parser.add_argument('--weights', type=str, default='/home/faith/yolov5-pose-onnx/Yolov5s6_pose_640.pt', help='initial weights path')
 
-    # parser.add_argument('--cfg', type=str, default='/home/faith/yolov5-pose-onnx/models/hub/yolov5s6_kpts.yaml', help='model.yaml path')
-    parser.add_argument('--cfg', type=str, default='/home/faith/yolov5-pose-onnx/models/hub/yolov5n-ghost-v3.yaml', help='model.yaml path')
-    parser.add_argument('--batch-size', type=int, default=256, help='total batch size for all GPUs')
+    parser.add_argument('--cfg', type=str, default='/home/faith/yolov5-pose-onnx/models/hub/yolov5s6_kpts_cpu.yaml', help='model.yaml path')
+    # parser.add_argument('--cfg', type=str, default='/home/faith/yolov5-pose-onnx/models/hub/yolov5n-ghost-v3.yaml', help='model.yaml path')
+    parser.add_argument('--batch-size', type=int, default=32, help='total batch size for all GPUs')
     # parser.add_argument('--batch-size', type=int, default=128, help='total batch size for all GPUs')
     
     parser.add_argument('--data', type=str, default='data/coco_kpts.yaml', help='data.yaml path')
